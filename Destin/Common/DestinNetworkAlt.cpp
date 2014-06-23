@@ -1,5 +1,6 @@
 #include "DestinNetworkAlt.h"
 #include <stdio.h>
+#include<string.h>
 
 void DestinNetworkAlt::initTemperatures(int layers, uint * centroids){
     temperatures = new float[layers];
@@ -56,6 +57,7 @@ void DestinNetworkAlt::init(SupportedImageWidths width, unsigned int layers,
     dc->gamma = gamma;
     dc->isUniform = isUniform;
     dc->lambdaCoeff = lambdaCoeff;
+   
     std::copy(centroid_counts, centroid_counts + layers, dc->layerMaxNb); // max number of centroids
 
     if(layer_widths != NULL){ // provide support for non standard heirarchy
@@ -76,6 +78,7 @@ void DestinNetworkAlt::init(SupportedImageWidths width, unsigned int layers,
     std::copy(temperatures, temperatures + layers, dc->temperatures);
 
     destin = InitDestinWithConfig(dc);
+    destin->rindex=0;
     if(destin == NULL){
         throw std::runtime_error("Could not create the destin structure. Perhaps the given layer widths is not supported.");
     }
@@ -171,7 +174,7 @@ std::vector<float> DestinNetworkAlt::getLayersVariances()
     return variances;
 }
 
-float DestinNetworkAlt::getQuality(int layer)
+float DestinNetworkAlt::getQuality(int layer) //Quality= separation-variance
 {
     return getSep(layer)-getVar(layer);
 }
@@ -235,7 +238,7 @@ void DestinNetworkAlt::getSelectedCentroid(int layer, int idx, std::vector<float
     Node * currNode = getNode(layer, 0, 0);
     for(int i=0; i<currNode->ns; ++i)
     {
-        outCen.push_back(currNode->mu[idx][i]);
+        outCen.push_back(currNode->mu[idx][i]);//mu gives the matrix of centroids where idx is id of node and i is no of states for centroid
     }
 }
 
@@ -263,42 +266,45 @@ void DestinNetworkAlt::normalizeChildrenPart(std::vector<float> & inCen, int ni)
 // 2013.9.2
 //   Remove the rescale_up and rescale_down; Focus on the recursive steps;
 //   Bug now: the value bigger than 1???
-void DestinNetworkAlt::rescaleCentroid(int srcLayer, int idx, int dstLayer)
+std::vector<float> DestinNetworkAlt::rescaleCentroid(int srcLayer, int idx, int dstLayer)
 {
+    std::vector<float> ran;
     if(!isUniform)
     {
         printf("The rescaling action NOW is only for Uniform DeSTIN!\n");
-        return;
+        return ran;
     }
 
-    if(srcLayer == dstLayer)
+   /* if(srcLayer == dstLayer)
     {
         printf("You are joking!\n");
-        return;
-    }
+        return ran;
+    }*/
 
     if(srcLayer < dstLayer)
     {
         std::vector<float> selCen;
+        //stores the state of the selected centroid in selCen
         getSelectedCentroid(srcLayer, idx, selCen);
         //
-        rescaleRecursiveUp(srcLayer, selCen, dstLayer);
+        return rescaleRecursiveUp(srcLayer, selCen, dstLayer);
     }
-    else if(srcLayer > dstLayer)
+    else if(srcLayer >= dstLayer)
     {
         std::vector<float> selCen;
         getSelectedCentroid(srcLayer, idx, selCen);
         //
-        rescaleRecursiveDown(srcLayer, selCen, dstLayer);
+        return rescaleRecursiveDown(srcLayer, selCen, dstLayer);
     }
 }
 
-void DestinNetworkAlt::rescaleRecursiveUp(int srcLayer, std::vector<float> selCen, int dstLayer)
+std::vector<float> DestinNetworkAlt::rescaleRecursiveUp(int srcLayer, std::vector<float> selCen, int dstLayer)
 {
     if(srcLayer == dstLayer)
     {
-        printFloatVector("---Result is:\n", selCen);
-        return;
+        //printFloatVector("---Result is:\n", selCen);
+        return selCen;
+        
     }
     else
     {
@@ -462,16 +468,17 @@ void DestinNetworkAlt::rescaleRecursiveUp(int srcLayer, std::vector<float> selCe
             newSelCen.push_back( 1/(float)parentNode->np );
         }
 
-        rescaleRecursiveUp(srcLayer+1, newSelCen, dstLayer);
+        return rescaleRecursiveUp(srcLayer+1, newSelCen, dstLayer);
     }
 }
 
-void DestinNetworkAlt::rescaleRecursiveDown(int srcLayer, std::vector<float> selCen, int dstLayer)
+std::vector<float> DestinNetworkAlt::rescaleRecursiveDown(int srcLayer, std::vector<float> selCen, int dstLayer)
 {
     if(srcLayer == dstLayer)
     {
-        printFloatVector("---Result is:\n", selCen);
-        return;
+        //printFloatVector("---Result is:\n", selCen);
+        return selCen;
+        
     }
     else
     {
@@ -506,7 +513,7 @@ void DestinNetworkAlt::rescaleRecursiveDown(int srcLayer, std::vector<float> sel
                 }
             }
 
-            // Downsampling method: pickping left-up one
+            // Downsampling method: picking left-up one
             std::vector<int> vecIdx;
             vecIdx.push_back(0);
             vecIdx.push_back(2);
@@ -574,7 +581,7 @@ void DestinNetworkAlt::rescaleRecursiveDown(int srcLayer, std::vector<float> sel
             newSelCen.push_back(1 / (float)childNode->np);
         }
 
-        rescaleRecursiveDown(srcLayer-1, newSelCen, dstLayer);
+        return rescaleRecursiveDown(srcLayer-1, newSelCen, dstLayer);
     }
 }
 
@@ -628,14 +635,112 @@ void DestinNetworkAlt::setMaximumCentroidCounts(int count)
     }
 }
 
-void DestinNetworkAlt::doDestin(float * input_array ) {
+int min(int a,int b){if(a>b){return b;} return a;}
+
+std::vector<int> DestinNetworkAlt::layerSizes()
+{	
+	std::vector<int> v;
+	int i;
+	for(i=0;i<destin->nLayers;i++){v.push_back(destin->layerSize[i]);}
+	return v;
+}
+
+
+
+
+
+
+void DestinNetworkAlt::doDestinwithIter(float * input_array,int iter,int maxiter,int rescaleiter)
+{
+
+	 int i,j,k,l;
+	 std::vector<float> v;
+	 float newmu[5000];
+     	Node *currnode,*destnode;
+	
+    	if(iter==0){destin->rindex=0;}
+        Uniform_DeleteCentroids(destin);
+        
+        Uniform_AddNewCentroids(destin);
+        //rescale iter is the iteration from which you want to enable rescaling of centroids
+        if(iter>=(rescaleiter))
+    	{
+    	
+    	//Uniform_DeleteCentroids(destin);
+    	int row,col,width;
+    	currnode=GetNodeFromDestin(destin,7,0,0);
+    	i=6;
+    	{
+    	
+    	width=sqrt(destin->layerSize[6]);
+    	for(row=0;row<width;row++)
+    	{
+    		for(col=0;col<width;col++)
+    		{
+    			
+			destnode=GetNodeFromDestin(destin,i,row,col);
+			for(j=0;j<currnode->nb;j++)
+			{	
+				v=rescaleCentroid(7,j,i);
+				if(iter>rescaleiter)
+				{
+					 DeleteUniformCentroid(destin,i,j);
+       					
+       				}
+				memset(newmu,0,sizeof(newmu));
+				for(k=0;k<v.size();k++)
+				{	
+					newmu[k]=v[k];
+				}
+				AddRescaledCentroids(destin,i,newmu,0);
+			}
+		}
+	}
+		
+	}
+    	
+    	destin->rescale=1;	
+    	}
+        
+    
+    FormulateBelief(destin, input_array);
+    v.clear();
+    if(iter>=(maxiter-2))
+    {
+    Uniform_DeleteCentroids(destin);
+    }
+   
+     if(this->callback != NULL){
+        this->callback->callback(*this );
+    }
+}
+    
+uint DestinNetworkAlt::getrindex()
+{
+	return destin->rindex;
+}
+
+void DestinNetworkAlt::doDestin(float * input_array) { //the image input array
 
     if (destin->isUniform){
-        Uniform_DeleteCentroids(destin);
+    	printf("it is uniform\n");
+    	
+       //Uniform_DeleteCentroids(destin);
         Uniform_AddNewCentroids(destin);
+        
+        //printFloatCentroids(0);
     }
-
+   
+    
+    
+    
     FormulateBelief(destin, input_array);
+    //n=GetNodeFromDestin(destin,7,0,0);
+    //trial run the src node is the top node(7) and destination node is toplayer-1
+    
+    int i,j,k;
+    
+      
 
     if(this->callback != NULL){
         this->callback->callback(*this );
@@ -648,6 +753,19 @@ void DestinNetworkAlt::isTraining(bool isTraining) {
        destin->layerMask[l] = isTraining ? 1 : 0;
     }
 }
+
+
+std::vector<float> DestinNetworkAlt::getNodeCentroidPositions(int centroid,int layer, int row, int col){
+	std::vector<float> v;
+	Node *n=getNode(layer,0,0);
+	v.push_back((float)(n->ni));
+	for(int d=0;d<n->ns;d++)
+	{
+		v.push_back(n->mu[centroid][d]);
+	}
+	return v;
+}
+	
 
 void DestinNetworkAlt::printNodeCentroidPositions(int layer, int row, int col){
     Node * n = getNode(layer, row, col);
@@ -945,6 +1063,7 @@ cv::Mat DestinNetworkAlt::getCentroidImageM(int layer, int centroid, int disp_wi
 void DestinNetworkAlt::displayCentroidImage(int layer, int centroid, int disp_width, bool enhanceContrast, string window_name){
     getCentroidImageM(layer, centroid, disp_width, enhanceContrast);
     cv::imshow(window_name.c_str(), centroidImageResized);
+    cv::waitKey(2000);
 }
 
 void DestinNetworkAlt::saveCentroidImage(int layer, int centroid, string filename, int disp_width, bool enhanceContrast){
