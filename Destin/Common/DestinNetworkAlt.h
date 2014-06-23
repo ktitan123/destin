@@ -24,6 +24,7 @@ extern "C" {
 #include "node.h"
 #include "centroid.h"
 #include "cent_image_gen.h"
+#include "array.h"
 }
 
 #include "DestinIterationFinishedCallback.h"
@@ -84,6 +85,9 @@ private:
      */
     void initTemperatures(int layers, uint * centroids);
 
+	/*Procedure for adding rescaled centroids*/
+    
+    
     void init(SupportedImageWidths width, unsigned int layers,
               unsigned int centroid_counts [], bool isUniform,
               int extRatio,  unsigned int layer_widths[]);
@@ -109,11 +113,12 @@ private:
     void getSelectedCentroid(int layer, int idx, std::vector<float> & outCen);
     void normalizeChildrenPart(std::vector<float> & inCen, int ni);
     // Prints all centroids
-    void printFloatCentroids(int layer);
+    //***************8
+    //void printFloatCentroids(int layer);
     // Prints the vector with a given title
     void printFloatVector(std::string title, std::vector<float> vec);
-    void rescaleRecursiveUp(int srcLayer, std::vector<float> selCen, int dstLayer);
-    void rescaleRecursiveDown(int srcLayer, std::vector<float> selCen, int dstLayer);
+    std::vector<float> rescaleRecursiveUp(int srcLayer, std::vector<float> selCen, int dstLayer);
+    std::vector<float> rescaleRecursiveDown(int srcLayer, std::vector<float> selCen, int dstLayer);
 
 public:
 
@@ -144,12 +149,14 @@ public:
       * The size of this array should be equal width x width, where width was passed
       * into the DestinNetworkAlt constructor.
       */
+      
+    void doDestinwithIter(float * input_array,int iter,int maxiter,int rescaleiter);
     void doDestin(float * input_array);
-
+	void printFloatCentroids(int layer);
     int getInputImageWidth(){
         return inputImageWidth;
     }
-
+    uint getrindex();
     /** Gets centroid images as raw float arrays
       * To get a particular centroid image:
       * float * image_array = getCentroidImages()[channel][layer][centroid];
@@ -179,7 +186,7 @@ public:
     std::vector<float> getLayersQualities();
 
     /*************************************************************************/
-    void rescaleCentroid(int srcLayer, int idx, int dstLayer);
+    std::vector<float> rescaleCentroid(int srcLayer, int idx, int dstLayer);
 
 
     void isTraining(bool isTraining);
@@ -247,7 +254,7 @@ public:
      *  and the dimensions which cluster on the parents previous belief.
      */
     void printNodeCentroidPositions(int layer, int row, int col);
-
+ 	std::vector<float> getNodeCentroidPositions(int centroid,int layer,int row,int col);
     /** Prints a grid of winning centroid numbers for a layer.
       * The grid is the size of the layer in nodes. Each
       * node has a winning centroid number.
@@ -281,7 +288,9 @@ public:
     unsigned int getLayerCount(){
         return destin->nLayers;
     }
-
+    std::vector<int> layerSizes();
+    
+    
     /** Saves the current destin network to file
      * Includes centroid locations, and current and previous beliefs.
      */
