@@ -28,6 +28,7 @@ void _normalizeMu(float * mu, uint ni, uint nb, uint np)
     uint i;
 
     // TODO: in recursive mode previous belief and parent belief should be normalized to 1
+    
 
     // Recurrent mode off
     for (i = ni; i < ni+nb; i++)
@@ -231,6 +232,174 @@ void DeleteUniformCentroid(Destin *d, uint l, uint idx)
 }
 
 void _generateNewUniformCentroidMu(Destin *d, uint l, uint vicinity, float * newMu);
+
+//function for adding rescaled centroids to the existing system.
+//Here each node has an extra belief dimensionality(an extra centroid)
+void AddRescaledCentroids(Destin *destin,uint l,float * rcentroid,uint centid)
+{
+	uint i,j,ns,nb,np,idx,ni;
+	Node * n = GetNodeFromDestin(destin, l, 0, 0);
+    	nb = n->nb;ni = n->ni;np = n->np;ns = n->ns;
+    	idx = ni + nb;
+    	float * rMu, * rSigma, * rAvgDelta, * rAvgSquaredDelta;
+	
+	//if rescaled function was already called before we delete duplicate centroids
+	if(destin->rescale==1)
+	{
+		
+		for(i=rindex;i<destin->nb[l];i++)
+		{
+			DeleteUniformCentroid(destin,l,i);
+		}
+	}
+	
+	
+	
+	//allocate space for  uniform centroid location
+	destin->rindex=ni+nb;
+    	MALLOCV(rMu, float, (ns+1));
+    	MALLOCV(rSigma, float, (ns+1));
+    	MALLOCV(rAvgDelta, float, (ns+1));
+    	MALLOCV(rAvgSquaredDelta, float, (ns+1));
+    	
+    	//initializing rMu with rescaled centroid size
+    	for(i=0;i<ns;i++)
+    	{
+    		rMu[i]=rcentroid[i];
+    	}
+    	
+    	//initializing rsigma,rAvgDelta and rAvgSquaredDelta
+    	for (j=0; j < ns+1; j++)
+    	{
+        rSigma[j] = INIT_SIGMA;
+        rAvgDelta[j] = 0;
+        rAvgSquaredDelta[j] = 0;
+   	 }
+   	 
+   	 
+   	 //similiar to add uniform centroids in centroid.c
+   	 for (i = 0; i < nb; i++)
+   	{
+        ArrayInsertFloat(&destin->uf_mu[l][i], ns, idx, 0);
+        _normalizeMu(destin->uf_mu[l][i], ni, nb+1, np);
+       ArrayInsertFloat(&destin->uf_sigma[l][i], ns, idx, INIT_SIGMA);
+        ArrayInsertFloat(&destin->uf_avgDelta[l][i], ns, idx, 0);
+        ArrayInsertFloat(&destin->uf_avgSquaredDelta[l][i], ns, idx, 0);
+    	}
+    	
+    	ArrayInsertFloat(&destin->uf_absvar[l], ns, idx, 0);
+    	ArrayInsertFloat(&destin->uf_avgAbsDelta[l], ns, idx, 0);
+	ArrayAppendPtr((void *)&destin->uf_mu[l], nb, rMu);
+    	ArrayAppendPtr((void *)&destin->uf_sigma[l], nb, rSigma);
+    	ArrayAppendUInt(&destin->uf_winCounts[l], nb, 0);
+    	ArrayAppendLong(&destin->uf_persistWinCounts[l], nb, 0);
+    	ArrayAppendLong(&destin->uf_persistWinCounts_detailed[l], nb, 0);
+    	ArrayAppendPtr((void *)&destin->uf_avgDelta[l], nb, rAvgDelta);
+    	ArrayAppendPtr((void *)&destin->uf_avgSquaredDelta[l], nb, rAvgSquaredDelta);
+    	ArrayAppendFloat(&destin->uf_starv[l], nb, 1);
+
+    	ArrayAppendFloat(&destin->uf_winFreqs[l], nb, 1/(float) nb);
+    	_normalizeFloatArray(destin->uf_winFreqs[l], nb+1);
+    	
+    	destin->nb[l]++;  // increase global number of centroids for layer l
+    	for (j = 0; j < destin->layerSize[l]; j++)
+    	{
+        n =& destin->nodes[destin->layerNodeOffsets[l] + j];
+
+        ArrayAppendFloat(&n->belief, nb, 0);
+        ArrayAppendFloat(&n->beliefEuc, nb, 0);
+        ArrayAppendFloat(&n->beliefMal, nb, 0);
+        ArrayAppendFloat(&n->outputBelief, nb, 0);
+        ArrayInsertFloat(&n->delta, ns, idx, 0);
+        ArrayInsertFloat(&n->observation, ns, idx, 0);
+
+        // increase centroid dimensionality for each node from layer l
+        UpdateNodeSizes(n, n->ni, nb+1, n->np, n->nc);
+
+        // pointers may change due to reallocation
+        n->mu = destin->uf_mu[l];
+        n->starv = destin->uf_starv[l];
+    	}
+    	if (l+1 < destin->nLayers)
+    {
+        n = GetNodeFromDestin(destin, l+1, 0, 0);
+        ns = n->ns;
+        uint childIndexes[n->nChildren];  // indexes of added centroids for all childs
+        float childValues[n->nChildren];  // initial values for all childs
+        float childSigmas[n->nChildren];
+
+        for (i = 0; i < n->nChildren; i++)
+        {
+            childIndexes[i] = (i+1)*nb;
+            childValues[i] = 0;
+            childSigmas[i] = INIT_SIGMA;
+        }
+        for (i = 0; i < n->nb; i++)
+        {
+            ArrayInsertFloats(&destin->uf_mu[l+1][i], ns, childIndexes, childValues, n->nChildren);
+            ArrayInsertFloats(&destin->uf_sigma[l+1][i], ns, childIndexes, childSigmas, n->nChildren);
+            ArrayInsertFloats(&destin->uf_avgDelta[l+1][i], ns, childIndexes, childValues, n->nChildren);
+            ArrayInsertFloats(&destin->uf_avgSquaredDelta[l+1][i], ns, childIndexes, childValues, n->nChildren);
+        }
+        ArrayInsertFloats(&destin->uf_absvar[l+1], ns, childIndexes, childValues, n->nChildren);
+        ArrayInsertFloats(&destin->uf_avgAbsDelta[l+1], ns, childIndexes, childValues, n->nChildren);
+
+        for (j = 0; j < destin->layerSize[l+1]; j++)
+        {
+            n =& destin->nodes[destin->layerNodeOffsets[l+1] + j];
+
+            ArrayInsertFloats(&n->delta, ns, childIndexes, childValues, n->nChildren);
+            ArrayInsertFloats(&n->observation, ns, childIndexes, childValues, n->nChildren);
+
+            // increase centroid dimensionality for each node from layer l+1
+            UpdateNodeSizes(n, n->ni + n->nChildren, n->nb, n->np, n->nc);
+
+            // pointers may change due to reallocation
+            n->mu = destin->uf_mu[l+1];
+            n->starv = destin->uf_starv[l+1];
+        }
+    }
+
+    // Layer l-1
+    if (l > 0)
+    {
+        n = GetNodeFromDestin(destin, l-1, 0, 0);
+        ns = n->ns;
+        uint pIdx = n->ni + n->nb + n->np;   // index of added parent centroid
+
+        for (i = 0; i < n->nb; i++)
+        {
+            ArrayInsertFloat(&destin->uf_mu[l-1][i], ns, pIdx, 0);
+            _normalizeMu(destin->uf_mu[l-1][i], n->ni, n->nb, n->np+1);
+            ArrayInsertFloat(&destin->uf_sigma[l-1][i], ns, pIdx, INIT_SIGMA);
+            ArrayInsertFloat(&destin->uf_avgDelta[l-1][i], ns, pIdx, 0);
+            ArrayInsertFloat(&destin->uf_avgSquaredDelta[l-1][i], ns, pIdx, 0);
+        }
+        ArrayInsertFloat(&destin->uf_absvar[l-1], ns, pIdx, 0);
+        ArrayInsertFloat(&destin->uf_avgAbsDelta[l-1], ns, pIdx, 0);
+
+        for (j = 0; j < destin->layerSize[l-1]; j++)
+        {
+            n =& destin->nodes[destin->layerNodeOffsets[l-1] + j];
+
+            ArrayInsertFloat(&n->delta, ns, pIdx, 0);
+            ArrayInsertFloat(&n->observation, ns, pIdx, 0);
+
+            // increase centroid dimensionality for each node from layer l-1
+            UpdateNodeSizes(n, n->ni, n->nb, n->np+1, n->nc);
+
+            // pointers may change due to reallocation
+            n->mu = destin->uf_mu[l-1];
+            n->starv = destin->uf_starv[l-1];
+        }
+    }
+
+    	
+    	return;
+    	
+    	
+}
+	
 
 void AddUniformCentroid(Destin *d, uint l)
 {
@@ -549,4 +718,3 @@ void _generateNewUniformCentroidMu(Destin *d, uint l, uint vicinity, float * new
     // TODO: in recurrent mode take care about position nb+1
     _normalizeMu(newMu, ni, nb+1, np);
 }
-
