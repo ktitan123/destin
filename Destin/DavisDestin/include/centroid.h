@@ -3,6 +3,12 @@
 
 #include "destin.h"
 
+void _normalizeFloatArray(float * array, uint length);
+void _normalizeMu(float * mu, uint ni, uint nb, uint np);
+
+//adds the uniform rescaled centroids
+void AddRescaledCentroids(Destin *destin,uint l,float * rcentroid,uint idx);
+
 void InitUniformCentroids(
         Destin *destin,   // initialized destin pointer
         uint l,           // layer
@@ -22,5 +28,6 @@ void AddUniformCentroid(
         Destin *destin,   // initialized destin pointer
         uint l            // layer
      );
+
 
 #endif
