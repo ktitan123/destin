@@ -5,6 +5,7 @@ import time
 import pydestin as pd
 import czt_mod as czm
 import charting as chart
+import math
 
 batch_mode = False
 experiment_id = None
@@ -31,23 +32,31 @@ if (len(sys.argv) > 1):
 
 experiment_root_dir="./experiment_runs"
 
-ims = pd.ImageSouceImpl(512, 512)
+ims = pd.ImageSouceImpl(512,512)
 
 #letters = "LO+"
-letters = "ABCDE"
+letters = "A"
+#ims.addImage("/home/kevin/Desktop/GSOC/trainimages/img1.png")
 for l in letters:
-    ims.addImage(czm.homeFld + "/Downloads/destin_toshare/train images/%s.png" % l)
+    ims.addImage("/home/kevin/Desktop/GSOC/trainimages/%s.png" % l)
+        
+    
+
 
 if not batch_mode:
     centroids = [4,8,16,32,64,32,16,len(letters)]
+    
+    
+    
 else:
     centroids = [start_centroids for i in range(7)]
     centroids.append(len(letters))
 
+print 1
 layers = len(centroids)
 top_layer = layers - 1
 draw_layer = top_layer
-iterations = 3000
+iterations = 3500
 #image_mode = pd.DST_IMG_MODE_RGB
 image_mode = pd.DST_IMG_MODE_GRAYSCALE
 dn = pd.DestinNetworkAlt( pd.W512, layers, centroids, True, None, image_mode)
@@ -56,10 +65,12 @@ dn.setBeliefTransform(pd.DST_BT_NONE)
 pd.SetLearningStrat(dn.getNetwork(), pd.CLS_FIXED)
 
 if batch_mode:
+    print "yes"
     dn.setFrequencyCoefficients(freq_coeff, freq_treshold, add_coeff)
     dn.setStarvationCoefficient(starv_coeff)
     dn.setMaximumCentroidCounts(max_centroids)
 
+print 2
 #dn.setBeliefTransform(pd.DST_BT_P_NORM)
 #ut=1.5
 #dn.setTemperatures([ut,ut,ut,ut,ut,ut,ut,ut])
@@ -68,23 +79,34 @@ weight_exponent = 4
 
 save_root="./saves/"
 
+def printcen(layer):
+    dn.printFloatCentroids(layer)
+    #cv.WaitKey(100)
 
 def train():
+    
     for i in xrange(iterations):
+        #print i
         if i % 10 == 0:
+            nodes=dn.layerSizes()
             variances = dn.getLayersVariances();
             separations = dn.getLayersSeparations();
-
+            
             chart.update([separations[draw_layer] - variances[draw_layer], variances[draw_layer], separations[draw_layer]])
             chart.draw()
             
-            if (i % 300) == 0:
+            if (i % 500) == 0:
                 print "#####################################";
                 print "Iteration " + str(i)
+                
                 print ""
 
                 for j in range(len(centroids)):
+
+                    positions=dn.getNodeCentroidPositions(0,j,0,0)
                     print "Layer: " + str(j)
+                    print "Size of each layer: " + str(nodes)
+                    #print "Centroid positions: " + str(positions)
                     print "Variance: " + str(variances[j])
                     print "Separation: " + str(separations[j])
                     print "Quality: " + str(separations[j] - variances[j])
@@ -93,6 +115,8 @@ def train():
                 sys.stdout.flush()
 
         ims.findNextImage()
+        
+        
         #dn.clearBeliefs()
         for j in range(1):
             if image_mode == pd.DST_IMG_MODE_GRAYSCALE:
@@ -101,21 +125,34 @@ def train():
                 f = ims.getRGBImageFloat()
             else:
                 raise Exception("unsupported image mode")
-            dn.doDestin(f)
+            dn.doDestinwithIter(f,i,3500,3499)
+            #dn.doDestin(f)
+            
+
+        
+                    
+                
+            	
+                
+        
+        
 
 #display centroid image
-def dci(layer, cent, equalize_hist = False, exp_weight = 4):
+def dci(layer, cent, equalize_hist,exp_weight,size):
     if cent >= dn.getBeliefsPerNode(layer):
         print "centroid out bounds"
         return
+    dn.imageWinningCentroidGrid(layer,1,"winning grid layer %s" % layer)
     dn.setCentImgWeightExponent(exp_weight)
-    dn.displayCentroidImage(layer, cent, 256, equalize_hist)
+    dn.displayCentroidImage(layer, cent, size, equalize_hist,"winning layer %s" % layer)
     cv.WaitKey(100)
 
 def dcis(layer):
     dn.displayLayerCentroidImages(layer,1000)
-    cv.WaitKey(100)
-    
+    print "displaying"
+    #cv.WaitKey(100)
+
+
 
 def mkdir(path):
     try:
@@ -156,7 +193,7 @@ def saveCenImages(run_id, layer):
     
         # save original enhanced
         fn = orige_dir + f
-        dn.saveCentroidImage(layer, i, fn, 512, True )
+        dn.saveCentroidImage(layer, i, fn,512, True )
     
     
     dn.setCentImgWeightExponent(weight_exponent)
@@ -205,5 +242,7 @@ else:
     dn.load(to_load)
 
 dn.save("letter_exp.dst")
-dcis(top_layer)
 
+print "done"
+dci(top_layer,0,True,4,256)
+dci(top_layer-1,0,True,4,256)
