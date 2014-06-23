@@ -21,7 +21,9 @@ typedef struct Destin {
     uint *nb;                           // current number of beliefs in a node of a layer
     uint *layerMaxNb;                   // max number of beliefs for layer (upper limit for centroid addition)
     uint *nci;                          // input dimensionality for layer 0 and number of children for layers above zero
-
+    uint rescale ;                      //1 if rescale is enabled else 0
+    uint rindex;                         //the index in d->uf_mu from which are rescaled centroids
+    
     struct Node * nodes;                // pointer to list of host nodes
 
     float       * temp;                 // temperatures for each layer, used with the belief tranform functions.
@@ -48,7 +50,7 @@ typedef struct Destin {
                                         // which means all nodes in a layer share their centroids
 
     // uniform destin shared centroid variables
-    float       *** uf_mu;              // shared centroids location, resizable array of size nl x nb x ns
+    float       *** uf_mu;              // shared centroids location, resizable array of size nl x nb x ns number of layers,beliefs per layer,number of states
     float       *** uf_sigma;           // shared centroids sigma, resizable array of size nl x nb x ns
     float       ** uf_absvar;           // layers absolute deviation, resizable array of size nl x ns
 
