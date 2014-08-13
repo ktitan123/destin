@@ -143,14 +143,14 @@ public:
                      DstImageMode imageMode = DST_IMG_MODE_GRAYSCALE);
 
     virtual ~DestinNetworkAlt();
-
+   
     /** Runs the DeSTIN algorithm on the float array input.
       * This is usually a square greyscale image made of float values between 0.0 and 1.0
       * The size of this array should be equal width x width, where width was passed
       * into the DestinNetworkAlt constructor.
       */
       
-    void doDestinwithIter(float * input_array,int iter,int maxiter,int rescaleiter);
+    void doDestinwithRescaling(float * input_array,int iter,int maxiter,int rescaleiter,int rescaletilllayer,int toplayer);
     void doDestin(float * input_array);
 	void printFloatCentroids(int layer);
     int getInputImageWidth(){
@@ -424,7 +424,9 @@ public:
      * @return - list of centroid incies in the sorted order
      */
     std::vector<int> sortLayerCentroids(int layer);
-
+	
+	//add the rescaled centroids
+	void Uniform_addRescaledCentroids(Destin *destin,int layer,int iter,int rescaleiter,int toplayer);
 };
 
 
