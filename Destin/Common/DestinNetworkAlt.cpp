@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include<string.h>
 
+ 
 void DestinNetworkAlt::initTemperatures(int layers, uint * centroids){
     temperatures = new float[layers];
 
@@ -488,9 +489,9 @@ std::vector<float> DestinNetworkAlt::rescaleRecursiveDown(int srcLayer, std::vec
         std::vector<float> normSelCen;
 
         // Display all centroids on source layer
-        printFloatCentroids(srcLayer);
+        //printFloatCentroids(srcLayer);
         // Display the selected centroid
-        printFloatVector("---The selected centroid is:\n", selCen);
+        //printFloatVector("---The selected centroid is:\n", selCen);
 
         if(srcLayer == 1)
         {
@@ -646,33 +647,22 @@ std::vector<int> DestinNetworkAlt::layerSizes()
 }
 
 
-
-
-
-
-void DestinNetworkAlt::doDestinwithIter(float * input_array,int iter,int maxiter,int rescaleiter)
+void DestinNetworkAlt::Uniform_addRescaledCentroids(Destin *destin,int layer,int iter,int rescaleiter,int toplayer)
 {
-
-	 int i,j,k,l;
-	 std::vector<float> v;
-	 float newmu[5000];
+	int row,col,width;
+	int i,j,k,l,m;
+	int index=0;
+	float newmu[50000];
      	Node *currnode,*destnode;
-	
-    	if(iter==0){destin->rindex=0;}
-        Uniform_DeleteCentroids(destin);
-        
-        Uniform_AddNewCentroids(destin);
-        //rescale iter is the iteration from which you want to enable rescaling of centroids
-        if(iter>=(rescaleiter))
-    	{
+	std::vector<float> v;
+	v.clear();
+    	currnode=GetNodeFromDestin(destin,toplayer,0,0);
     	
-    	//Uniform_DeleteCentroids(destin);
-    	int row,col,width;
-    	currnode=GetNodeFromDestin(destin,7,0,0);
-    	i=6;
-    	{
+    	i=layer;
+        {
     	
-    	width=sqrt(destin->layerSize[6]);
+        width=sqrt(destin->layerSize[i]);
+        row=0;col=0;
     	for(row=0;row<width;row++)
     	{
     		for(col=0;col<width;col++)
@@ -680,8 +670,9 @@ void DestinNetworkAlt::doDestinwithIter(float * input_array,int iter,int maxiter
     			
 			destnode=GetNodeFromDestin(destin,i,row,col);
 			for(j=0;j<currnode->nb;j++)
+			
 			{	
-				v=rescaleCentroid(7,j,i);
+				v=rescaleCentroid(toplayer,j,i);
 				if(iter>rescaleiter)
 				{
 					 DeleteUniformCentroid(destin,i,j);
@@ -692,27 +683,80 @@ void DestinNetworkAlt::doDestinwithIter(float * input_array,int iter,int maxiter
 				{	
 					newmu[k]=v[k];
 				}
-				AddRescaledCentroids(destin,i,newmu,0);
+				AddRescaledCentroids(destin,i,newmu,0,index);
+				
 			}
+			
 		}
 	}
-		
-	}
+	}	
+	
     	
     	destin->rescale=1;	
-    	}
+    	
+ }
+
+
+//iter: current iteration
+//maxiter:maximum number of iterations
+//rescaleiter: iteration from which rescaling with additional centroids begins(usually maxiter-1)
+//rescaletilllayer: layer till which rescaling is done(top down)
+//toplayer : topmost layer (no of layers-1)
+void DestinNetworkAlt::doDestinwithRescaling(float * input_array,int iter,int maxiter,int rescaleiter,int rescaletilllayer,int toplayer)
+{
+
+	 
+	 
+	  Uniform_DeleteCentroids(destin);
+	
+    	if(iter==0){destin->rindex=0;}
+        int k,i;
+        
+       
+        if(iter>rescaleiter && iter<maxiter-1)
+        {
+       	std::vector<float> v;
+       	float newmu[5000];
+       	
+       	for(i=0;i<=6;i++)
+       	{
+       		memset(newmu,0,sizeof(newmu));
+	       	for(int j=0;j<destin->nb[toplayer];j++)
+	       	{
+       		v.clear();
+       		v=rescaleCentroid(toplayer,j,i);
+       		for(k=0;k<v.size();k++)
+		{	
+		newmu[k]=v[k];
+		}
+		Uniform_AddRescale(destin,newmu,i,toplayer);
+        	}
+        }
+        }
+        //else
+        
+        {
+        if(iter<maxiter-1){Uniform_AddNewCentroids(destin);}	
+        }
+        //rescale iter is the iteration from which you want to enable rescaling of centroids
+        
+    	 
         
     
-    FormulateBelief(destin, input_array);
-    v.clear();
-    if(iter>=(maxiter-2))
-    {
-    Uniform_DeleteCentroids(destin);
-    }
+    	FormulateBelief(destin, input_array);
+   	
+    	if(iter>=maxiter-1)
+    	{
+    	printf("enable rescale\n");
+    	for(i=toplayer-1;i>=rescaletilllayer;i--){Uniform_addRescaledCentroids(destin,i,iter,rescaleiter,toplayer);}
+    	
+    	}
+    	
+    
    
      if(this->callback != NULL){
         this->callback->callback(*this );
-    }
+    	}
 }
     
 uint DestinNetworkAlt::getrindex()
@@ -723,9 +767,9 @@ uint DestinNetworkAlt::getrindex()
 void DestinNetworkAlt::doDestin(float * input_array) { //the image input array
 
     if (destin->isUniform){
-    	printf("it is uniform\n");
+    	//printf("it is uniform\n");
     	
-       //Uniform_DeleteCentroids(destin);
+       Uniform_DeleteCentroids(destin);
         Uniform_AddNewCentroids(destin);
         
         //printFloatCentroids(0);
@@ -1084,6 +1128,7 @@ void DestinNetworkAlt::displayLayerCentroidImages(int layer,
         return;
     }
     cv::imshow(window_title, getLayerCentroidImages(layer, scale_width, border_width, sort_order));
+    cv::waitKey();
     return;
 }
 
