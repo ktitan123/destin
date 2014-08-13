@@ -33,9 +33,8 @@ if (len(sys.argv) > 1):
 experiment_root_dir="./experiment_runs"
 
 ims = pd.ImageSouceImpl(512,512)
-
 #letters = "LO+"
-letters = "A"
+letters = "EFA"
 #ims.addImage("/home/kevin/Desktop/GSOC/trainimages/img1.png")
 for l in letters:
     ims.addImage("/home/kevin/Desktop/GSOC/trainimages/%s.png" % l)
@@ -45,6 +44,7 @@ for l in letters:
 
 if not batch_mode:
     centroids = [4,8,16,32,64,32,16,len(letters)]
+    #centroids = [4,8,16,32,32,16,8,4]
     
     
     
@@ -56,7 +56,7 @@ print 1
 layers = len(centroids)
 top_layer = layers - 1
 draw_layer = top_layer
-iterations = 3500
+iterations = 4000
 #image_mode = pd.DST_IMG_MODE_RGB
 image_mode = pd.DST_IMG_MODE_GRAYSCALE
 dn = pd.DestinNetworkAlt( pd.W512, layers, centroids, True, None, image_mode)
@@ -125,7 +125,7 @@ def train():
                 f = ims.getRGBImageFloat()
             else:
                 raise Exception("unsupported image mode")
-            dn.doDestinwithIter(f,i,3500,3499)
+            dn.doDestinwithRescaling(f,i,4000,5000,6,7)
             #dn.doDestin(f)
             
 
