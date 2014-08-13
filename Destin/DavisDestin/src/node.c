@@ -544,10 +544,47 @@ void Uniform_AddNewCentroids(Destin *d)
         float rnd = (float) rand() / (float) RAND_MAX;
         if (rnd < d->addCoeff * absvar)
         {
-            AddUniformCentroid(d, l);
+           AddUniformCentroid(d, l);
+            
         }
     }
 }
+
+uint min(uint a,uint b) {if(a<b){return a;}return b;}	
+
+void Uniform_AddRescale(Destin *d,float *rcentroid,int destlayer,int srclayer)
+{
+    uint l, i,j;
+    float absvar;
+    l=destlayer;
+    //for(l=srclayer-1;l>=0;l--)
+    {
+    	if (d->layerMask[l] == 0 || d->nb[l] >= d->layerMaxNb[l])
+        {
+            //continue;
+            return;
+        }
+    	Node *n=GetNodeFromDestin(d, l, 0, 0);
+    	
+    	absvar=0;
+    	for (i = 0; i < n->ns; i++)
+        {
+            absvar += d->uf_absvar[l][i];
+        }
+        absvar /= n->ns;
+        float rnd = (float) rand() / (float) RAND_MAX;
+        //float rnd=0.654;
+        if (rnd < d->addCoeff * absvar)
+        {
+        //for(j=0;j<min(n->nb,d->nb[srclayer]);j++)
+        {
+        AddRescaledCentroids(d,l,rcentroid,0,n->ns+1);
+        }
+        }
+    }
+    
+}
+	
 
 void UpdateNodeSizes(Node * n, uint ni, uint nb, uint np, uint nc)
 {
