@@ -182,6 +182,8 @@ void Uniform_DeleteCentroids(
 void Uniform_AddNewCentroids(
                     struct Destin  *
                 );
+                
+void Uniform_AddRescale(struct Destin *,float *,int,int);
 
 
 #endif
