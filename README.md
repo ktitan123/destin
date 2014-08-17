@@ -121,3 +121,40 @@ changing the line:
 to 
 
     vs = pd.VideoSource(True, "")
+    
+    
+Here is my final documentation of the GSOC project.
+
+Task:
+Implementation of scale invariance in Uniform Destin.
+
+Approach:
+
+The approach I took is largely similiar to the implementation of translational invariance in Uniform Destin. 
+However unlike translational invariance I had added centroids at the levels to be rescaled as well.
+
+What I had done before midterm evaluation:
+
+The function AddRescaledCentroids in centroid.c adds the rescaled centroids for each node in the destination layer into the centroid pool for layer. My implementation is similar to the implementation of AddUniformCentroid in centroid.c. My function basically allocates space for extra centroids and their dimensions and appends it to uniform mu (destin->uf_mu) and updates other parameters as well such as sigma,absolute variance etc.
+I have managed to implement the deletion of duplicate or redundant centroids in the function doDestinwithRescaling in DestinNetworkAlt.cpp. Basically it removes additional or overlapping centroids with each added iteration. For each iteration an extra rescaled centroid is added to each node in the destination layer and replaced on subsequent iterations.
+The function  doDestinwithRescaling acts like a main function and calls the AddRescaledCentroids function for each node and each centroid in the source layer.This function can be modified according to specific needs and constraints.
+
+What I have done after midterms:
+
+•	Implemented rescaling at all levels for all iterations above a certain threshold. Basically this is similar to the way uniform centroids were added at each level.                                              
+In the file node.c I have added a function Uniform_addRescale which takes as input the destination layer and source layer and uniformly incorporates the rescaled centroids into the centroid pool at that layer.
+This function is called for all layers below the destination layer. The function is similar to add_Uniform function in node.c.
+
+•	I have balanced the adding of Uniform(translation invariant) centroids as well as the rescaled centroids. This required a lot of trial and error based testing to check most optimal arrangement when uniform and rescaled centroids needed to be added so that the centroid pool is cleaner and there won’t be mix-up of features.
+
+
+Core Functionality:
+Function doDestinwithRescale  is the main function in DestinNetworkAlt.cpp which basically calls all the rescaling processes.  It has arguments which specify max number of iterations, number of iterations till which rescaling is applied etc. It calls the function Uniform_addRescaledCentroids which is the function which adds the rescaled centroids to corresponding nodes.
+
+The function Uniform_addRescaledCentroids takes as input the destination and source layers. For each centroid in each node of the destination layer, that centroid is rescaled from source to destination layer and added to the centroid pool for that layer. It adds a centroid for every node in that layer and this extra rescaled centroid is shown in the centroid image as the rescaled image of the source layer.
+The function add_Rescaledcentroids provides the functionality for the actual rescaling of centroids which is passed by the Uniform_addRescaledCentroid function mentioned above. For each centroid it calls the rescale_centroid function which returns a vector which corresponds to the value for the rescaled centroid.
+
+Results:
+I have tested my entire implementation on letter_experiments.py which essentially enables recognition of handwritten letters. 
+The results are promising although despite exhaustive testing I haven’t been able to achieve a perfect accuracy between the rescaled images and the original images. Through various heuristics l have been able to improve upon the similarities between the original and rescaled images considerably compared to during the midterm evaluations mostly due to the addition of centroids during several iterations.
+
